@@ -1,0 +1,142 @@
+name: CI & Security Test Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint-and-static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Lint with flake8
+        run: |
+          flake8 app/ --max-line-length=100 --statistics --count
+
+      - name: Static analysis with bandit
+        run: |
+          bandit -r app/ -c
+
+      - name: Type checking with mypy
+        run: |
+          pip install mypy
+          mypy app/
+
+  unit-and-integration-tests:
+    runs-on: ubuntu-latest
+    needs: lint-and-static-analysis
+    env:
+      PYTHONPATH: .
+      ENV: "test"
+      # Gerekli test API key dummy değerler veya gerçek test anahtarları buraya eklenebilir
+      COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY_TEST }}
+      COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY_TEST }}
+      MESSARI_API_KEY: ${{ secrets.MESSARI_API_KEY_TEST }}
+      CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY_TEST }}
+      LUNARCRUSH_API_KEY: ${{ secrets.LUNARCRUSH_API_KEY_TEST }}
+      DEFILLAMA_API_KEY: ${{ secrets.DEFILLAMA_API_KEY_TEST }}
+      ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY_TEST }}
+      BSCSCAN_API_KEY: ${{ secrets.BSCSCAN_API_KEY_TEST }}
+      SOLSCAN_API_KEY: ${{ secrets.SOLSCAN_API_KEY_TEST }}
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run unit and integration tests with coverage
+        run: |
+          pytest --cov=app --cov-report=term-missing --cov-report=xml tests/
+          coverage report --fail-under=80
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+
+  dependency-vulnerability-scan:
+    runs-on: ubuntu-latest
+    needs: [lint-and-static-analysis, unit-and-integration-tests]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pip-audit safety
+
+      - name: Safety scan
+        run: |
+          pip install -r requirements.txt
+          safety check -r requirements.txt
+
+      - name: pip-audit scan
+        run: |
+          pip-audit -r requirements.txt
+
+  docker-image-security:
+    runs-on: ubuntu-latest
+    needs: [unit-and-integration-tests]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t app-backend:ci .
+
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: app-backend:ci
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+
+  api-contract-and-docs:
+    runs-on: ubuntu-latest
+    needs: [unit-and-integration-tests]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Start API and test OpenAPI docs
+        run: |
+          pip install -r requirements.txt
+          nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          sleep 5
+          curl -sf http://localhost:8000/docs > /dev/null
+          curl -sf http://localhost:8000/openapi.json > openapi.json
+
+      - name: Validate OpenAPI schema
+        uses: char0n/swagger-editor-validate@v1
+        with:
+          definition-file: openapi.json
