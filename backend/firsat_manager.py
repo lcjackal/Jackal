@@ -1,7 +1,10 @@
 import time
 import uuid
 import json
+from fastapi import FastAPI
 from backend.db import save_opportunity, load_opportunities
+
+app = FastAPI()
 
 class OpportunityStatus:
     ACTIVE = "aktif"
@@ -92,3 +95,8 @@ def refresh_opportunities(live_data):
             opp.update(coin_data["new_prediction"], OpportunityStatus.UPDATED, "Tahmin güncellendi")
         save_opportunity(opp)
     return [o for o in current.values()]
+
+# Örnek bir endpoint (test amaçlı)
+@app.get("/opportunities")
+def get_opportunities():
+    return load_opportunities()

@@ -93,3 +93,44 @@ def load_setting(key, default=None):
     row = c.fetchone()
     conn.close()
     return row["value"] if row else default
+
+# --- Opportunities Fonksiyonları ---
+
+def save_opportunity(opportunity):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        INSERT OR REPLACE INTO opportunities (
+            id, coin, initial_prediction, current_prediction, status, reason,
+            first_detected, last_update, history
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        opportunity.get("id"),
+        opportunity.get("coin"),
+        opportunity.get("initial_prediction"),
+        opportunity.get("current_prediction"),
+        opportunity.get("status"),
+        opportunity.get("reason"),
+        opportunity.get("first_detected"),
+        opportunity.get("last_update"),
+        json.dumps(opportunity.get("history", []))
+    ))
+    conn.commit()
+    conn.close()
+
+def load_opportunities():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM opportunities")
+    rows = c.fetchall()
+    conn.close()
+    opportunities = []
+    for row in rows:
+        opp = dict(row)
+        if "history" in opp and opp["history"]:
+            try:
+                opp["history"] = json.loads(opp["history"])
+            except Exception:
+                opp["history"] = []
+        opportunities.append(opp)
+    return opportunities
