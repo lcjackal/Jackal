@@ -62,6 +62,18 @@
     - PORTS panelini yenile, portu “Public” yap.
     - Sorun devam ederse Codespaces’i yeniden başlat.
 
+- **Uncaught SyntaxError: Export 'import_react3' is not defined in module**
+  - Çözüm:  
+    - node_modules, .vite, dist, package-lock.json dosyalarını silip tekrar yükle:
+      ```
+      rm -rf node_modules .vite dist package-lock.json
+      npm install
+      npm run dev -- --host --port 4173
+      ```
+    - Sadece kendi yazdığın kaynak dosyaları (App.tsx, main.tsx, components klasörü) yeni projeye kopyala, derlenmiş veya gereksiz dosya taşımamaya dikkat et.
+    - Hâlâ hata devam ederse, sıfırdan yeni bir Vite projesi oluşturup sadece kaynak kodunu taşı.
+    - Sıfırdan oluşturulan projede hata yoksa, eski projede bozuk veya uyumsuz bir dosya vardır.
+
 ---
 
 ## 3. Genel İpuçları
@@ -70,6 +82,8 @@
 - **Codespaces’te localhost yerine .github.dev adresini kullan.**
 - **PORTS panelinde ilgili portun “Public” olduğundan emin ol.**
 - **Her değişiklik sonrası terminalde hata olup olmadığını kontrol et.**
+- **node_modules, .vite, dist gibi klasörleri asla kopyalama veya repoya ekleme.**
+- **Sadece kaynak kodunu (src klasörü ve package.json) taşı.**
 
 ---
 
